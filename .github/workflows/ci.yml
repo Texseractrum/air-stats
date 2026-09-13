@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Test API, data handling, and OAuth
+        run: swift test
+      - name: Test direct-download routing
+        run: node --test deploy/worker.test.mjs
+      - name: Build universal app
+        run: AIRSTATS_UNIVERSAL=1 bash scripts/build.sh

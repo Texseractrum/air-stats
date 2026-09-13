@@ -1,0 +1,12 @@
+.context/
+.build/
+dist/
+.DS_Store
+*.xcuserstate
+client_secret*.json
+credentials*.json
+.env*
+*.p8
+*.p12
+*.pem
+.wrangler/

@@ -1,0 +1,21 @@
+AIR STATS
+
+1. Drag Air Stats into Applications.
+2. Open Air Stats from Applications and click its menu-bar item.
+3. Choose Connect with Google and import your own Desktop app OAuth JSON.
+
+Requires macOS 14 or later. Supports Apple silicon and Intel Macs.
+
+Setup instructions: https://github.com/Texseractrum/air-stats#google-cloud-setup
+Source and issues: https://github.com/Texseractrum/air-stats
+
+Check the release notes for notarization status. The initial signed preview
+is not notarized, so Gatekeeper may block first launch. After reviewing the
+source and checksum, you can choose System Settings > Privacy & Security >
+Open Anyway. Do not disable Gatekeeper globally.
+
+Your imported configuration and tokens are stored in this Mac's Keychain.
+No developer credentials, health data, or telemetry are bundled in this app.
+
+Heart rate is the latest synced reading, not a live Bluetooth stream.
+Google does not expose Fitbit Sleep Score or Daily Readiness through this API.

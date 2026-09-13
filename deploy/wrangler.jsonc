@@ -1,0 +1,9 @@
+{
+  "name": "air-stats-download",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-13",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "health.sparkles.dev", "custom_domain": true }
+  ]
+}
