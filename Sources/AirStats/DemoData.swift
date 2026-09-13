@@ -9,9 +9,11 @@ enum DemoData {
         let today = calendar.startOfDay(for: now)
         result.fetchedAt = now
         let pattern: [Double] = [61, 63, 62, 60, 62, 65, 63, 62, 64, 63, 61, 64, 68, 66, 65, 63, 64, 62, 61, 64]
-        result.heart = (0..<240).map { index in
-            HeartSample(time: now.addingTimeInterval(Double(index - 240) * 60),
-                        bpm: pattern[index % pattern.count] + (index > 115 && index < 160 ? 16 : 0))
+        result.heart = (0..<240).map { (index: Int) -> HeartSample in
+            let offset: TimeInterval = Double(index - 240) * 60
+            let activityIncrease: Double = (index > 115 && index < 160) ? 16 : 0
+            let bpm: Double = pattern[index % pattern.count] + activityIncrease
+            return HeartSample(time: now.addingTimeInterval(offset), bpm: bpm)
         }
         let nights: [Double] = [425, 402, 461, 437, 414, 489, 462]
         for index in 0..<7 {
