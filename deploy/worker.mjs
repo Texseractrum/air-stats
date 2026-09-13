@@ -1,4 +1,4 @@
-export const downloadURL = 'https://github.com/Texseractrum/air-stats/releases/latest/download/AirStats.dmg';
+export const downloadURL = 'https://github.com/Texseractrum/air-stats/releases/latest/download/AirStats.dmg?download=1';
 
 export default {
   fetch(request) {
