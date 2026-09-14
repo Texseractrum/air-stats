@@ -1,86 +1,133 @@
 import AppKit
-import HealthCore
 import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var store: AppStore
+    @StateObject private var agentIntegration = AgentIntegrationController()
+    @State private var confirmDisconnect = false
+    @State private var confirmAgentSetup = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Make it yours").font(.system(size: 21, weight: .medium, design: .rounded))
-            Surface {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionLabel(title: "Google account", symbol: "person.crop.circle", color: Palette.green)
-                    HStack {
-                        Circle().fill(store.isConnected ? Palette.green : .secondary).frame(width: 6, height: 6)
-                        Text(store.isConnected ? "Connected to Google Health" : "Not connected").font(.system(size: 12, weight: .medium))
-                    }
-                    if let config = store.auth.configuration {
-                        Text("OAuth project: \(config.installed.project_id)").font(.system(size: 10)).foregroundStyle(.secondary).textSelection(.enabled)
-                    }
-                    HStack {
-                        Button(store.auth.isSigningIn ? "Waiting for Google…" : store.isConnected ? "Reconnect" : "Connect with Google") { store.connect() }
-                            .buttonStyle(.borderedProminent).disabled(store.auth.isSigningIn)
-                        if store.auth.isSigningIn { Button("Cancel") { store.auth.cancelSignIn() } }
-                        else if store.isConnected { Button("Disconnect") { store.disconnect() } }
-                    }.controlSize(.small)
-                    Button("Import OAuth JSON…") { store.chooseConfiguration() }.buttonStyle(.link).font(.system(size: 11))
-                    Text("Read-only access to sleep, activity, vitals, and devices. Credentials and tokens are saved in Keychain. Health readings are kept in memory and cleared on disconnect.")
-                        .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).lineSpacing(2)
+        Form {
+            if let error = store.error ?? store.auth.error {
+                Section("Connection needs attention") {
+                    Text(error).foregroundStyle(.secondary).textSelection(.enabled)
+                    Button("Dismiss error") { store.error = nil; store.auth.error = nil }
                 }
             }
-            Surface {
-                VStack(alignment: .leading, spacing: 13) {
-                    SectionLabel(title: "In your menu bar", symbol: "menubar.rectangle", color: Palette.blue)
-                    settingToggle("Heart rate", binding: $store.showHeart)
-                    settingToggle("Sleep duration", binding: $store.showSleep)
-                    settingToggle("Steps", binding: $store.showSteps)
-                    settingToggle("Heart rate variability", binding: $store.showHRV)
-                    Text("A trailing dot marks an older reading. Open Air Stats to see its date and time.")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
-                }.font(.system(size: 12)).toggleStyle(.switch).controlSize(.mini)
-            }
-            Surface {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionLabel(title: "Preferences", symbol: "gearshape", color: Palette.purple)
-                    Picker("Refresh every", selection: $store.refreshInterval) {
-                        Text("1 minute").tag(60.0)
-                        Text("5 minutes").tag(300.0)
-                        Text("15 minutes").tag(900.0)
-                    }.font(.system(size: 12))
-                    Toggle("Launch at login", isOn: Binding(get: { store.launchAtLogin }, set: { store.setLaunchAtLogin($0) }))
-                        .toggleStyle(.switch).controlSize(.mini).font(.system(size: 12))
-                    Text("Refreshing checks Google's latest synced data. Sync your tracker in the phone app for newer readings.")
-                        .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Section {
+                LabeledContent("Status") {
+                    Label(store.isConnected ? "Connected" : "Not connected", systemImage: store.isConnected ? "checkmark.circle.fill" : "person.crop.circle.badge.questionmark")
+                        .foregroundStyle(store.isConnected ? Color.accentColor : Color.secondary)
                 }
+                if let config = store.auth.configuration {
+                    LabeledContent("OAuth project", value: config.installed.project_id).textSelection(.enabled)
+                }
+                HStack(spacing: 8) {
+                    Button { store.connect() } label: {
+                        Text(store.auth.isSigningIn ? "Waiting for Google…" : store.isConnected ? "Reconnect" : "Connect with Google").foregroundStyle(.white)
+                    }.modifier(PrimaryButtonStyle()).disabled(store.auth.isSigningIn)
+                    if store.auth.isSigningIn { Button("Cancel sign-in") { store.auth.cancelSignIn() } }
+                    else if store.isConnected { Button("Disconnect", role: .destructive) { confirmDisconnect = true } }
+                }
+                Button("Import OAuth JSON…") { store.chooseConfiguration() }
+            } header: { Text("Google account") }
+            footer: { Text("Read-only access. Credentials and tokens stay in Keychain. Health readings are cleared when you disconnect.") }
+
+            Section {
+                Toggle("Heart rate", isOn: $store.showHeart)
+                Toggle("Sleep duration", isOn: $store.showSleep)
+                Toggle("Steps", isOn: $store.showSteps)
+                Toggle("Heart rate variability", isOn: $store.showHRV)
+            } header: { Text("In your menu bar") }
+            footer: { Text("A trailing dot marks an older reading. Open Air Stats to see its timestamp.") }
+
+            Section {
+                Picker("Refresh every", selection: $store.refreshInterval) {
+                    Text("1 minute").tag(60.0)
+                    Text("5 minutes").tag(300.0)
+                    Text("15 minutes").tag(900.0)
+                }
+                Toggle("Launch at login", isOn: Binding(get: { store.launchAtLogin }, set: { store.setLaunchAtLogin($0) }))
+            } header: { Text("Preferences") }
+            footer: { Text("Refresh checks Google's latest synced data. Sync your tracker in the phone app for newer readings.") }
+
+            Section {
+                LabeledContent("Status") {
+                    if agentIntegration.isWorking {
+                        ProgressView().controlSize(.small).accessibilityLabel("Checking agent access")
+                    } else {
+                        Label(agentIntegration.status,
+                              systemImage: agentIntegration.isInstalled ? "checkmark.circle.fill" : "sparkles")
+                            .foregroundStyle(agentIntegration.isInstalled ? Color.accentColor : Color.secondary)
+                    }
+                }
+                if let detail = agentIntegration.detail {
+                    Text(detail).foregroundStyle(.secondary).textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 8) {
+                    Button(agentIntegration.isInstalled ? "Update agent access…" : "Set up agent access…") {
+                        confirmAgentSetup = true
+                    }
+                    .disabled(agentIntegration.isWorking || store.isDemo || !store.isConnected)
+                    if agentIntegration.hasAnyInstallation {
+                        Button("Remove agent access", role: .destructive) { agentIntegration.uninstall() }
+                            .disabled(agentIntegration.isWorking)
+                    }
+                }
+            } header: { Text("Claude Code and Codex") }
+            footer: {
+                Text(store.isDemo
+                     ? "Agent access is unavailable while previewing sample data."
+                     : store.isConnected
+                        ? "Installs a local, read-only tool and health skill. When you ask about your health, the selected agent sends those readings to its model provider. OAuth tokens stay in Keychain."
+                        : "Connect your Google account before setting up agent access.")
             }
+            .task { if !store.isDemo { agentIntegration.refresh() } }
+
+            Section {
+                LabeledContent("Version", value: store.updates.installedVersionLabel)
+                Toggle("Automatically check for updates", isOn: Binding(
+                    get: { store.updates.automaticallyChecksForUpdates },
+                    set: { store.updates.automaticallyChecksForUpdates = $0 }
+                ))
+                Toggle("Count this install anonymously", isOn: Binding(
+                    get: { store.updates.sharesAnonymousUsage },
+                    set: { store.updates.sharesAnonymousUsage = $0 }
+                ))
+                Button("Check for Updates…") { store.updates.checkForUpdates() }
+            } header: { Text("Updates") }
+            footer: {
+                Text("Checks the public Air Stats releases once a day. Counting sends that same check through health.sparkles.dev with the app and macOS version, so the project can see how many people use Air Stats. No account, device identifier, or health data is sent. Turn it off to ask GitHub directly. Downloads always come from health.sparkles.dev.")
+            }
+
             if !store.snapshot.issues.isEmpty {
-                Surface {
-                    VStack(alignment: .leading, spacing: 12) {
-                        SectionLabel(title: "Connection details", symbol: "exclamationmark.circle", color: Palette.gold)
-                        ForEach(store.snapshot.issues.keys.sorted(), id: \.self) { key in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(key.replacingOccurrences(of: "-", with: " ").capitalized).font(.system(size: 11, weight: .medium))
-                                Text(store.snapshot.issues[key] ?? "").font(.system(size: 10)).foregroundStyle(.secondary)
-                            }
-                        }
+                Section("Connection details") {
+                    ForEach(store.snapshot.issues.keys.sorted(), id: \.self) { key in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(key.replacingOccurrences(of: "-", with: " ").capitalized).fontWeight(.medium)
+                            Text(store.snapshot.issues[key] ?? "").foregroundStyle(.secondary).textSelection(.enabled)
+                        }.fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
-            HStack {
+            Section {
                 Button(store.isDemo ? "Exit preview" : "Preview sample data") { if store.isDemo { store.endPreview() } else { store.preview() } }
-                Spacer()
+                Link("Manage Google permissions", destination: URL(string: "https://myaccount.google.com/connections")!)
                 Button("Quit Air Stats") { NSApp.terminate(nil) }.keyboardShortcut("q")
-            }.buttonStyle(.link).font(.system(size: 11))
-            Link("Manage Google permissions ↗", destination: URL(string: "https://myaccount.google.com/connections")!)
-                .font(.system(size: 10))
-            Text("Air Stats 1.0 · An independent Fitbit companion").font(.system(size: 9)).foregroundStyle(.secondary)
+            } footer: { Text("Air Stats · An independent Fitbit companion") }
         }
-    }
-    private func settingToggle(_ title: String, binding: Binding<Bool>) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Toggle(title, isOn: binding).labelsHidden().accessibilityLabel(title)
+        .formStyle(.grouped).scrollContentBackground(.hidden)
+        .toggleStyle(.switch).controlSize(.small).font(.system(size: 12))
+        .confirmationDialog("Disconnect from Google?", isPresented: $confirmDisconnect, titleVisibility: .visible) {
+            Button("Disconnect", role: .destructive) { store.disconnect() }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("This removes your saved sign-in and clears the readings on this Mac. Your Fitbit data is not deleted.") }
+        .confirmationDialog("Set up local agent access?", isPresented: $confirmAgentSetup, titleVisibility: .visible) {
+            Button("Set up agent access") { agentIntegration.install() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Air Stats will add a read-only health tool and skill to installed copies of Claude Code and Codex. Readings are fetched only when you ask, then shared with that agent's model provider.")
         }
     }
 }

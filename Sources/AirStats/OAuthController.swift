@@ -39,10 +39,14 @@ final class OAuthController: ObservableObject {
     }
     func importConfiguration(_ url: URL) throws {
         let data = try Data(contentsOf: url)
-        let configuration = try OAuthConfiguration.read(data)
+        let nextConfiguration = try OAuthConfiguration.read(data)
         cancelSignIn()
+        if let previousClientID = configuration?.installed.client_id,
+           previousClientID != nextConfiguration.installed.client_id {
+            try Keychain.delete("tokens.\(previousClientID)")
+        }
         try Keychain.save(data, account: "oauth.configuration")
-        self.configuration = configuration
+        configuration = nextConfiguration
         tokens = nil
         isConnected = false
         if let data = try Keychain.read(tokenAccount) {
@@ -107,7 +111,8 @@ final class OAuthController: ObservableObject {
     }
     func disconnect() throws {
         cancelSignIn()
-        try Keychain.delete(tokenAccount)
+        // Remove tokens left by any previously imported OAuth client as well as the active one.
+        try Keychain.deleteAccounts(prefix: "tokens.")
         tokens = nil
         isConnected = false
         error = nil

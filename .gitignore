@@ -9,4 +9,5 @@ credentials*.json
 *.p8
 *.p12
 *.pem
+*.profraw
 .wrangler/

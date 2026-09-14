@@ -5,5 +5,10 @@
   "workers_dev": false,
   "routes": [
     { "pattern": "health.sparkles.dev", "custom_domain": true }
+  ],
+  // Counts downloads and daily update checks. No request bodies, addresses, or
+  // health data are recorded; see the install counting notes in README.md.
+  "analytics_engine_datasets": [
+    { "binding": "USAGE", "dataset": "air_stats_usage" }
   ]
 }

@@ -17,6 +17,18 @@ final class HealthCoreTests: XCTestCase {
         XCTAssertEqual(HealthParser.steps([try json(#"{"steps":{"count":"0"}}"#)]), 0)
     }
 
+    func testStableReleaseVersionsCompareNumerically() throws {
+        XCTAssertLessThan(try XCTUnwrap(ReleaseVersion("v1.9.9")), try XCTUnwrap(ReleaseVersion("1.10.0")))
+        XCTAssertEqual(ReleaseVersion("1.0"), ReleaseVersion("v1.0.0"))
+        XCTAssertGreaterThan(try XCTUnwrap(ReleaseVersion("2.0.1")), try XCTUnwrap(ReleaseVersion("2.0.0")))
+    }
+
+    func testPrereleaseAndMalformedReleaseVersionsAreRejected() {
+        for value in ["", "v", "1..0", "1.2-beta", "release-2.0", "1.2.3.4x"] {
+            XCTAssertNil(ReleaseVersion(value), value)
+        }
+    }
+
     func testHeartSamplesAreSortedDeduplicatedAndKeepMeasurementTime() throws {
         let points = try json(#"[{"heartRate":{"sampleTime":{"physicalTime":"2026-09-13T14:01:00.123Z"},"beatsPerMinute":"64"}},{"heartRate":{"sampleTime":{"physicalTime":"2026-09-13T14:00:00Z"},"beatsPerMinute":62}},{"heartRate":{"sampleTime":{"physicalTime":"2026-09-13T14:00:00Z"},"beatsPerMinute":62}},{"heartRate":{"beatsPerMinute":"70"}},{"heartRate":{"sampleTime":{"physicalTime":"2026-09-13T15:00:00Z"},"beatsPerMinute":"0"}}]"#).array
         let result = HealthParser.heart(points)
@@ -57,6 +69,25 @@ final class HealthCoreTests: XCTestCase {
             SleepSession(start: now.addingTimeInterval(-3600), end: now, day: "2026-09-13", minutesAsleep: 50, stages: [], stageMinutes: [:], isMain: false)
         ]
         XCTAssertEqual(snapshot.latestSleep?.minutesAsleep, 450)
+    }
+
+    func testRepresentativeSleepUsesMainSessionOrLongestFallbackForEachDay() {
+        let now = Date()
+        func sleep(day: String, hoursAgo: Double, minutes: Double, isMain: Bool) -> SleepSession {
+            let end = now.addingTimeInterval(-hoursAgo * 3600)
+            return SleepSession(start: end.addingTimeInterval(-minutes * 60), end: end, day: day,
+                                minutesAsleep: minutes - 20, stages: [], stageMinutes: [:], isMain: isMain)
+        }
+        var snapshot = HealthSnapshot()
+        snapshot.sleep = [
+            sleep(day: "2026-09-12", hoursAgo: 30, minutes: 80, isMain: false),
+            sleep(day: "2026-09-12", hoursAgo: 26, minutes: 420, isMain: false),
+            sleep(day: "2026-09-13", hoursAgo: 12, minutes: 460, isMain: false),
+            sleep(day: "2026-09-13", hoursAgo: 4, minutes: 50, isMain: true)
+        ]
+
+        XCTAssertEqual(snapshot.representativeSleepByDay.map(\.day), ["2026-09-12", "2026-09-13"])
+        XCTAssertEqual(snapshot.representativeSleepByDay.map { Int($0.minutesInBed) }, [420, 50])
     }
 
     func testDailyMetricsUseDocumentedFieldsAndDateObjects() throws {

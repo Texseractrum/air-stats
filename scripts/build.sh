@@ -4,6 +4,9 @@ cd "$(dirname "$0")/.."
 # Local builds remain ad-hoc signed. Release packaging opts into both architectures
 # and a Developer ID identity without replacing an already-running local build.
 build_args=(-c release)
+if [[ -n "${AIRSTATS_BUILD_PATH:-}" ]]; then
+    build_args+=(--scratch-path "$AIRSTATS_BUILD_PATH")
+fi
 if [[ "${AIRSTATS_UNIVERSAL:-0}" == "1" ]]; then
     build_args+=(--arch arm64 --arch x86_64)
 fi
@@ -14,6 +17,8 @@ app_path="$output_dir/Air Stats.app"
 mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
 cp "$binary_dir/AirStats" "$app_path/Contents/MacOS/AirStats"
 cp Resources/Info.plist "$app_path/Contents/Info.plist"
+mkdir -p "$app_path/Contents/Resources/AgentSkills"
+ditto Resources/AgentSkills "$app_path/Contents/Resources/AgentSkills"
 swift scripts/icon.swift "$output_dir"
 cp "$output_dir/AppIcon.icns" "$app_path/Contents/Resources/AppIcon.icns"
 sign_args=(--force --sign "${AIRSTATS_SIGN_IDENTITY:--}" --identifier dev.sparkles.airstats)

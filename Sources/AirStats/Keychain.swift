@@ -31,6 +31,25 @@ enum Keychain {
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw failure(status) }
     }
+    static func deleteAccounts(prefix: String) throws {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service,
+                                    kSecReturnAttributes as String: true,
+                                    kSecMatchLimit as String: kSecMatchLimitAll]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return }
+        guard status == errSecSuccess else { throw failure(status) }
+        let items: [[String: Any]]
+        if let values = result as? [[String: Any]] { items = values }
+        else if let value = result as? [String: Any] { items = [value] }
+        else { items = [] }
+        for item in items {
+            if let account = item[kSecAttrAccount as String] as? String, account.hasPrefix(prefix) {
+                try delete(account)
+            }
+        }
+    }
     private static func failure(_ status: OSStatus) -> Error {
         OAuthError.message("Keychain: \(SecCopyErrorMessageString(status, nil) as String? ?? "storage unavailable").")
     }

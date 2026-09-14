@@ -22,6 +22,7 @@ final class AppStore: ObservableObject {
     @Published var showHRV: Bool { didSet { defaults.set(showHRV, forKey: "showHRV") } }
     @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
     let auth: OAuthController
+    let updates: UpdateChecker
     private let client = HealthClient()
     private let defaults: UserDefaults
     private var subscriptions = Set<AnyCancellable>()
@@ -33,6 +34,7 @@ final class AppStore: ObservableObject {
 
     init(preview: Bool = false) {
         defaults = preview ? UserDefaults(suiteName: "dev.sparkles.airstats.preview")! : .standard
+        updates = UpdateChecker(defaults: defaults)
         refreshInterval = defaults.object(forKey: "refreshInterval") as? Double ?? 300
         showHeart = defaults.object(forKey: "showHeart") as? Bool ?? true
         showSleep = defaults.object(forKey: "showSleep") as? Bool ?? true
@@ -54,12 +56,16 @@ final class AppStore: ObservableObject {
             Timer.publish(every: 15, on: .main, in: .common).autoconnect().sink { [weak self] date in
                 guard let self else { return }
                 self.now = date
-                if date >= self.nextRefresh { self.refresh() }
+                self.refreshIfDue(at: date)
             }.store(in: &subscriptions)
             NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification).sink { [weak self] _ in
-                Task { @MainActor in self?.refresh() }
+                Task { @MainActor in self?.refreshIfDue() }
             }.store(in: &subscriptions)
         }
+    }
+    func refreshIfDue(at date: Date = Date()) {
+        guard date >= nextRefresh else { return }
+        refresh()
     }
     func refresh() {
         guard isConnected, !isDemo, !isRefreshing else { return }

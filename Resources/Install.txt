@@ -15,7 +15,10 @@ source and checksum, you can choose System Settings > Privacy & Security >
 Open Anyway. Do not disable Gatekeeper globally.
 
 Your imported configuration and tokens are stored in this Mac's Keychain.
-No developer credentials, health data, or telemetry are bundled in this app.
+No developer credentials or health data are bundled in this app.
+Air Stats checks for updates once a day through health.sparkles.dev, which
+counts the install. It sends only the app and macOS version, never an account,
+identifier, or health reading. Settings > Updates turns the counting off.
 
 Heart rate is the latest synced reading, not a live Bluetooth stream.
 Google does not expose Fitbit Sleep Score or Daily Readiness through this API.

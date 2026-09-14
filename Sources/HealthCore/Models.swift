@@ -129,6 +129,11 @@ public struct HealthSnapshot: Sendable {
         let main = sleep.filter(\.isMain)
         return (main.isEmpty ? sleep : main).max(by: { $0.end < $1.end })
     }
+    public var representativeSleepByDay: [SleepSession] {
+        Dictionary(grouping: sleep, by: \.day).values.compactMap { sessions in
+            sessions.first(where: \.isMain) ?? sessions.max(by: { $0.minutesInBed < $1.minutesInBed })
+        }.sorted { $0.day < $1.day }
+    }
     public var hasData: Bool {
         !heart.isEmpty || !sleep.isEmpty || !restingHeart.isEmpty || !hrv.isEmpty || !oxygen.isEmpty || steps != nil
     }
