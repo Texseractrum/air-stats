@@ -30,12 +30,23 @@ final class OAuthController: ObservableObject {
     init(loadStored: Bool = true) {
         guard loadStored else { return }
         do {
+            // A user-imported client (Keychain) always wins; otherwise fall back to the
+            // client bundled with the app so people can connect without importing a JSON.
             if let data = try Keychain.read("oauth.configuration") { configuration = try OAuthConfiguration.read(data) }
+            else { configuration = Self.bundledConfiguration() }
             if configuration != nil, let data = try Keychain.read(tokenAccount) {
                 tokens = try JSONDecoder().decode(GoogleTokens.self, from: data)
                 isConnected = tokens != nil
             }
         } catch { self.error = error.localizedDescription }
+    }
+
+    /// The OAuth client shipped inside the app bundle, if present and valid.
+    /// Injected at build time (see scripts/build.sh); absent builds simply require an import.
+    static func bundledConfiguration() -> OAuthConfiguration? {
+        guard let url = Bundle.main.url(forResource: "DefaultOAuth", withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? OAuthConfiguration.read(data)
     }
     func importConfiguration(_ url: URL) throws {
         let data = try Data(contentsOf: url)

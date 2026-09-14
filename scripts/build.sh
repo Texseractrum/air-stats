@@ -19,6 +19,14 @@ cp "$binary_dir/AirStats" "$app_path/Contents/MacOS/AirStats"
 cp Resources/Info.plist "$app_path/Contents/Info.plist"
 mkdir -p "$app_path/Contents/Resources/AgentSkills"
 ditto Resources/AgentSkills "$app_path/Contents/Resources/AgentSkills"
+# Ship a default OAuth client so users can connect without importing a JSON.
+# Kept out of git (see .gitignore); builds without it simply prompt for an import.
+if [[ -f Resources/DefaultOAuth.json ]]; then
+    cp Resources/DefaultOAuth.json "$app_path/Contents/Resources/DefaultOAuth.json"
+    printf 'Bundled default OAuth client from Resources/DefaultOAuth.json\n'
+else
+    printf 'No Resources/DefaultOAuth.json; app will require an OAuth JSON import.\n'
+fi
 swift scripts/icon.swift "$output_dir"
 cp "$output_dir/AppIcon.icns" "$app_path/Contents/Resources/AppIcon.icns"
 sign_args=(--force --sign "${AIRSTATS_SIGN_IDENTITY:--}" --identifier dev.sparkles.airstats)

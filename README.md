@@ -12,7 +12,7 @@ Open the disk image, drag **Air Stats** to **Applications**, then open it. The a
 
 The initial release is **Developer ID signed but not yet notarized**. macOS Gatekeeper may block its first launch. Review the source and release checksum before choosing **System Settings → Privacy & Security → Open Anyway**, or build locally below. Do not disable Gatekeeper globally. Notarized releases will be explicitly identified in their release notes.
 
-You need your own Google **Desktop app** OAuth configuration to connect Fitbit. See [Google Cloud setup](#google-cloud-setup). No developer credentials are included in the download. Air Stats is an independent project, not affiliated with Google or Fitbit.
+Air Stats ships with a default Google **Desktop app** OAuth client, so you can connect Fitbit without any setup — just click **Connect with Google**. (A Desktop client's secret is not treated as confidential by Google, so it is safe to bundle.) If you would rather use your own Google Cloud project, import its Desktop-app OAuth JSON from Settings to override the default — see [Google Cloud setup](#google-cloud-setup). Air Stats is an independent project, not affiliated with Google or Fitbit.
 
 ## Run
 
@@ -21,7 +21,7 @@ bash scripts/build.sh
 bash scripts/run.sh
 ```
 
-This creates `dist/Air Stats.app`. Open the app, click its menu-bar item, then **Connect with Google**. Import your Google **Desktop app** OAuth client JSON when prompted. Sign in with the account linked to Fitbit and allow the four read-only permissions.
+This creates `dist/Air Stats.app`. Open the app, click its menu-bar item, then **Connect with Google**, sign in with the account linked to Fitbit, and allow the four read-only permissions. The default OAuth client is used automatically; to use your own instead, import its Desktop-app JSON from Settings.
 
 You can also import an existing credential file without putting its contents in source code:
 
@@ -29,7 +29,7 @@ You can also import an existing credential file without putting its contents in 
 bash scripts/run.sh --credentials /absolute/path/to/client_secret.json --connect
 ```
 
-The app stores the imported configuration and refresh token in macOS Keychain. The JSON is not copied into the app bundle. Importing a configuration is local to this Mac; a distributable build does not contain your credentials. Health readings live only in memory and are cleared when you disconnect or quit.
+The app bundles a default Desktop OAuth client inside `Air Stats.app`; its refresh token is stored in macOS Keychain after you connect. If you import your own OAuth JSON, that configuration and its token are stored in Keychain and take precedence over the bundled default; the imported JSON stays local to this Mac. Health readings live only in memory and are cleared when you disconnect or quit.
 
 ### Ask Claude Code or Codex about your health
 

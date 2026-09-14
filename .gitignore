@@ -11,3 +11,4 @@ credentials*.json
 *.pem
 *.profraw
 .wrangler/
+Resources/DefaultOAuth.json
