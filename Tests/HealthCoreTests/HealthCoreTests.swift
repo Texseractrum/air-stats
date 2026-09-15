@@ -231,6 +231,39 @@ final class HealthClientTests: XCTestCase {
         XCTAssertEqual(snapshot.devices.first?.battery, 78)
     }
 
+    func testUnlinkedAccountSaysHowToLinkInsteadOfTryAgainLater() async {
+        let body = #"{"error":{"code":400,"message":"The account is not linked to Google Health.","status":"FAILED_PRECONDITION","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCOUNT_NOT_LINKED"}]}}"#
+        StubProtocol.handler = { _ in (400, body) }
+        do { _ = try await client().points(type: "heart-rate", token: "test", now: Date()); XCTFail("Expected error") }
+        catch {
+            XCTAssertTrue(error.localizedDescription.contains("fitbit.google.com"), error.localizedDescription)
+            XCTAssertFalse(error.localizedDescription.contains("Try again later"))
+        }
+    }
+
+    func testOtherBadRequestsRepeatGooglesOwnExplanation() async {
+        StubProtocol.handler = { _ in (400, #"{"error":{"code":400,"message":"Invalid filter field.","status":"INVALID_ARGUMENT"}}"#) }
+        do { _ = try await client().points(type: "steps", token: "test", now: Date()); XCTFail("Expected error") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("Invalid filter field."), error.localizedDescription) }
+    }
+
+    func testFailedSourceKeepsTheLastKnownReadingRatherThanBlanking() async throws {
+        StubProtocol.handler = { request in
+            if request.url!.path.contains("/heart-rate/") { return (200, #"{"dataPoints":[{"heartRate":{"sampleTime":{"physicalTime":"2026-09-13T14:00:00Z"},"beatsPerMinute":62}}]}"#) }
+            if request.url!.path.contains("/steps/") { return (200, #"{"dataPoints":[{"steps":{"count":"1234"}}]}"#) }
+            return (200, "{}")
+        }
+        let good = try await client().snapshot(token: "test")
+        StubProtocol.handler = { request in
+            if request.url!.path.contains("/heart-rate/") { return (500, "{}") }
+            return (200, "{}")
+        }
+        let degraded = try await client().snapshot(token: "test").preservingReadings(from: good)
+        XCTAssertEqual(degraded.latestHeart?.bpm, 62)
+        XCTAssertNotNil(degraded.issues["heart-rate"])
+        XCTAssertNil(degraded.steps, "Steps succeeded with no data points and must not resurrect yesterday's total")
+    }
+
     func testTemperatureIsDeviationOnlyWhenBaselineExists() async throws {
         StubProtocol.handler = { request in
             if request.url!.path.contains("daily-sleep-temperature") {

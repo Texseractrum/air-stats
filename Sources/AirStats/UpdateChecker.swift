@@ -15,8 +15,9 @@ private struct GitHubRelease: Decodable {
 @MainActor
 final class UpdateChecker {
     private static let latestReleaseURL = URL(string: "https://api.github.com/repos/Texseractrum/air-stats/releases/latest")!
-    private static let countedReleaseURL = "https://health.sparkles.dev/latest"
-    private static let downloadURL = URL(string: "https://health.sparkles.dev")!
+    private static let countedReleaseURL = "https://health.aidaniil.com/latest"
+    /// The download path, not the landing page: an update dialog should hand over the disk image.
+    private static let downloadURL = URL(string: "https://health.aidaniil.com/download")!
     private static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
     private static let initialCheckDelay: TimeInterval = 8
 
@@ -140,7 +141,7 @@ final class UpdateChecker {
         return ReleaseVersion(value)
     }
 
-    /// The release service on health.sparkles.dev answers with the same public release
+    /// The release service on health.aidaniil.com answers with the same public release
     /// and counts the request, which is how the project knows how many installs exist.
     /// Opting out asks GitHub directly instead, so no request reaches the project at all.
     private func releaseURL(kind: CheckKind, installed: ReleaseVersion) -> URL {

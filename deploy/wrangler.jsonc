@@ -3,7 +3,10 @@
   "main": "worker.mjs",
   "compatibility_date": "2026-09-13",
   "workers_dev": false,
+  // health.aidaniil.com is the published home. health.sparkles.dev stays bound because
+  // copies of Air Stats released before the move still ask it for updates.
   "routes": [
+    { "pattern": "health.aidaniil.com", "custom_domain": true },
     { "pattern": "health.sparkles.dev", "custom_domain": true }
   ],
   // Counts downloads and daily update checks. No request bodies, addresses, or

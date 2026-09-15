@@ -138,6 +138,26 @@ public struct HealthSnapshot: Sendable {
         !heart.isEmpty || !sleep.isEmpty || !restingHeart.isEmpty || !hrv.isEmpty || !oxygen.isEmpty || steps != nil
     }
     public static func latest(_ values: [DailyMetric]) -> DailyMetric? { values.max(by: { $0.day < $1.day }) }
+    /// A failed source returns no data points, which would otherwise erase readings that are still
+    /// the newest ones known. Keep the previous values and let the stale markers age them instead.
+    public func preservingReadings(from previous: HealthSnapshot) -> HealthSnapshot {
+        var result = self
+        for type in issues.keys {
+            switch type {
+            case "heart-rate": result.heart = previous.heart
+            case "sleep": result.sleep = previous.sleep
+            case "steps": result.steps = previous.steps
+            case "daily-resting-heart-rate": result.restingHeart = previous.restingHeart
+            case "daily-heart-rate-variability": result.hrv = previous.hrv
+            case "daily-oxygen-saturation": result.oxygen = previous.oxygen
+            case "daily-respiratory-rate": result.respiration = previous.respiration
+            case "daily-sleep-temperature-derivations": result.temperature = previous.temperature
+            case "devices": result.devices = previous.devices
+            default: break
+            }
+        }
+        return result
+    }
 }
 
 public enum HealthParser {

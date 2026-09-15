@@ -20,9 +20,9 @@ function stubGitHub(response) {
 const settled = () => new Promise((resolve) => setImmediate(resolve));
 
 for (const method of ['GET', 'HEAD']) {
-  for (const path of ['/', '/download', '/AirStats.dmg', '/?campaign=test']) {
-    test(`${method} ${path} starts the download without a landing page`, async () => {
-      const response = worker.fetch(new Request(`https://health.sparkles.dev${path}`, { method }));
+  for (const path of ['/download', '/AirStats.dmg', '/download?campaign=test']) {
+    test(`${method} ${path} starts the download`, async () => {
+      const response = worker.fetch(new Request(`https://health.aidaniil.com${path}`, { method }));
       assert.equal(response.status, 302);
       assert.equal(response.headers.get('Location'), downloadURL);
       assert.equal(response.headers.get('Cache-Control'), 'no-store');
@@ -31,33 +31,72 @@ for (const method of ['GET', 'HEAD']) {
   }
 }
 
+test('the landing page offers the download and names the current release', async () => {
+  const github = stubGitHub(new Response(JSON.stringify({ tag_name: 'v1.2.0', body: 'Notes' }), { status: 200 }));
+  try {
+    const response = await worker.fetch(new Request('https://health.aidaniil.com/'), {});
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('Content-Type'), /^text\/html/);
+    const page = await response.text();
+    assert.match(page, /href="\/download"/);
+    assert.match(page, /v1\.2\.0/);
+    assert.doesNotMatch(page, /<script/i);
+  } finally {
+    github.restore();
+  }
+});
+
+test('the landing page still renders when the release lookup fails', async () => {
+  const github = stubGitHub(new Response('nope', { status: 500 }));
+  try {
+    const response = await worker.fetch(new Request('https://health.aidaniil.com/'), {});
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /Download for Mac/);
+  } finally {
+    github.restore();
+  }
+});
+
+test('the landing page is not counted and has no body on HEAD', async () => {
+  const { points, env } = recorder();
+  const github = stubGitHub(new Response(JSON.stringify({ tag_name: 'v1.2.0' }), { status: 200 }));
+  try {
+    const response = await worker.fetch(new Request('https://health.aidaniil.com/', { method: 'HEAD' }), env);
+    assert.equal(await response.text(), '');
+    await settled();
+    assert.deepEqual(points, []);
+  } finally {
+    github.restore();
+  }
+});
+
 test('unknown paths do not trigger downloads', () => {
   for (const path of ['/favicon.ico', '/robots.txt', '/secret', '//evil.example']) {
-    assert.equal(worker.fetch(new Request(`https://health.sparkles.dev${path}`)).status, 404);
+    assert.equal(worker.fetch(new Request(`https://health.aidaniil.com${path}`)).status, 404);
   }
 });
 test('HEAD 404 has no body', async () => {
-  assert.equal(await worker.fetch(new Request('https://health.sparkles.dev/nope', { method: 'HEAD' })).text(), '');
+  assert.equal(await worker.fetch(new Request('https://health.aidaniil.com/nope', { method: 'HEAD' })).text(), '');
 });
 test('write methods are rejected', () => {
   for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
-    const response = worker.fetch(new Request('https://health.sparkles.dev', { method }));
+    const response = worker.fetch(new Request('https://health.aidaniil.com', { method }));
     assert.equal(response.status, 405);
     assert.equal(response.headers.get('Allow'), 'GET, HEAD');
   }
 });
 test('query parameters cannot replace the download destination', () => {
-  const response = worker.fetch(new Request('https://health.sparkles.dev/?url=https://evil.example'));
+  const response = worker.fetch(new Request('https://health.aidaniil.com/download?url=https://evil.example'));
   assert.equal(response.headers.get('Location'), downloadURL);
 });
 
 test('downloads are counted without an analytics binding present', async () => {
-  assert.equal(worker.fetch(new Request('https://health.sparkles.dev/download'), {}).status, 302);
+  assert.equal(worker.fetch(new Request('https://health.aidaniil.com/download'), {}).status, 302);
 });
 
 test('downloads are counted', async () => {
   const { points, env } = recorder();
-  worker.fetch(new Request('https://health.sparkles.dev/download'), env);
+  worker.fetch(new Request('https://health.aidaniil.com/download'), env);
   await settled();
   assert.deepEqual(points[0].blobs, ['download', 'unknown', 'unknown', 'unknown']);
   assert.equal(points[0].indexes, undefined);
@@ -68,7 +107,7 @@ test('an update check is counted and answered from the public release', async ()
   const github = stubGitHub(new Response(JSON.stringify({ tag_name: 'v1.2.0', body: 'Notes' }), { status: 200 }));
   try {
     const response = await worker.fetch(
-      new Request('https://health.sparkles.dev/latest?k=daily&v=1.1.0&os=15.2'),
+      new Request('https://health.aidaniil.com/latest?k=daily&v=1.1.0&os=15.2'),
       env,
     );
     assert.equal(response.status, 200);
@@ -87,7 +126,7 @@ test('unrecognised check details are recorded as unknown rather than stored verb
   const github = stubGitHub(new Response(JSON.stringify({ tag_name: 'v1.2.0' }), { status: 200 }));
   try {
     await worker.fetch(
-      new Request('https://health.sparkles.dev/latest?k=<script>&v=not-a-version&os=' + '9'.repeat(40)),
+      new Request('https://health.aidaniil.com/latest?k=<script>&v=not-a-version&os=' + '9'.repeat(40)),
       env,
     );
     await settled();
@@ -104,7 +143,7 @@ test('repeat checks from one Mac share a daily key when a salt is configured', a
   try {
     for (const kind of ['daily', 'manual']) {
       await worker.fetch(
-        new Request(`https://health.sparkles.dev/latest?k=${kind}&v=1.1.0&os=15.2`, {
+        new Request(`https://health.aidaniil.com/latest?k=${kind}&v=1.1.0&os=15.2`, {
           headers: { 'CF-Connecting-IP': '203.0.113.7', 'User-Agent': 'AirStats/1.1.0 (2)' },
         }),
         env,
@@ -116,7 +155,7 @@ test('repeat checks from one Mac share a daily key when a salt is configured', a
     assert.equal(points[0].indexes[0], points[1].indexes[0]);
 
     await worker.fetch(
-      new Request('https://health.sparkles.dev/latest?k=daily&v=1.1.0&os=15.2', {
+      new Request('https://health.aidaniil.com/latest?k=daily&v=1.1.0&os=15.2', {
         headers: { 'CF-Connecting-IP': '203.0.113.8', 'User-Agent': 'AirStats/1.1.0 (2)' },
       }),
       env,
@@ -131,7 +170,7 @@ test('repeat checks from one Mac share a daily key when a salt is configured', a
 test('release notes are truncated so one release cannot bloat the response', async () => {
   const github = stubGitHub(new Response(JSON.stringify({ tag_name: 'v1.2.0', body: 'x'.repeat(9000) }), { status: 200 }));
   try {
-    const response = await worker.fetch(new Request('https://health.sparkles.dev/latest'), {});
+    const response = await worker.fetch(new Request('https://health.aidaniil.com/latest'), {});
     assert.equal((await response.json()).body.length, 4000);
   } finally {
     github.restore();
@@ -142,7 +181,7 @@ test('an unavailable release API fails without inventing a version', async () =>
   for (const upstream of [new Response('nope', { status: 503 }), new Response('{}', { status: 200 })]) {
     const github = stubGitHub(upstream);
     try {
-      const response = await worker.fetch(new Request('https://health.sparkles.dev/latest'), {});
+      const response = await worker.fetch(new Request('https://health.aidaniil.com/latest'), {});
       assert.equal(response.status, 502);
       assert.deepEqual(await response.json(), { error: 'upstream_unavailable' });
     } finally {
@@ -156,7 +195,7 @@ test('a check still counts when the release API is unreachable', async () => {
   const original = globalThis.fetch;
   globalThis.fetch = async () => { throw new Error('offline'); };
   try {
-    assert.equal((await worker.fetch(new Request('https://health.sparkles.dev/latest?k=install&v=1.1.0&os=15.2'), env)).status, 502);
+    assert.equal((await worker.fetch(new Request('https://health.aidaniil.com/latest?k=install&v=1.1.0&os=15.2'), env)).status, 502);
     await settled();
     assert.deepEqual(points[0].blobs, ['install', '1.1.0', '15.2', 'unknown']);
   } finally {
@@ -165,5 +204,5 @@ test('a check still counts when the release API is unreachable', async () => {
 });
 
 test('write methods are rejected on the release path too', () => {
-  assert.equal(worker.fetch(new Request('https://health.sparkles.dev/latest', { method: 'POST' }), {}).status, 405);
+  assert.equal(worker.fetch(new Request('https://health.aidaniil.com/latest', { method: 'POST' }), {}).status, 405);
 });

@@ -98,7 +98,7 @@ struct SettingsView: View {
                 Button("Check for Updates…") { store.updates.checkForUpdates() }
             } header: { Text("Updates") }
             footer: {
-                Text("Checks the public Air Stats releases once a day. Counting sends that same check through health.sparkles.dev with the app and macOS version, so the project can see how many people use Air Stats. No account, device identifier, or health data is sent. Turn it off to ask GitHub directly. Downloads always come from health.sparkles.dev.")
+                Text("Checks the public Air Stats releases once a day. Counting sends that same check through health.aidaniil.com with the app and macOS version, so the project can see how many people use Air Stats. No account, device identifier, or health data is sent. Turn it off to ask GitHub directly. Downloads always come from health.aidaniil.com.")
             }
 
             if !store.snapshot.issues.isEmpty {

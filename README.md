@@ -6,7 +6,7 @@ A native, lightweight macOS menu-bar companion for Fitbit Air and other Google/F
 
 ## Install
 
-[Download Air Stats for Mac](https://health.sparkles.dev) — opening this URL starts the latest `.dmg` download directly, with no landing page. The same universal app supports Apple silicon and Intel Macs.
+[Download Air Stats for Mac](https://health.aidaniil.com) — the download button there serves the latest `.dmg`, and `https://health.aidaniil.com/download` starts it directly. The same universal app supports Apple silicon and Intel Macs.
 
 Open the disk image, drag **Air Stats** to **Applications**, then open it. The app lives in the menu bar. macOS requires you to open and install downloaded apps; a website cannot silently install them.
 
@@ -64,7 +64,7 @@ Heart rate and daily vitals use labeled line charts with time/date and numeric a
 
 Move the pointer across a chart to inspect its time/date and value (five-minute averages for heart rate). Missing intervals are identified rather than borrowing a distant reading. When a chart has keyboard focus, use the Left and Right Arrow keys to inspect recorded points without a mouse. Overview is a fixed, non-scrollable layout; longer Sleep, Vitals, and Settings pages remain scrollable without scrollbar gutters. Connection errors stay reachable through a compact Settings action on Overview.
 
-Air Stats checks the repository's latest public GitHub release once a day by default. When a newer stable version is available, macOS shows an update dialog with options to download it, be reminded later, or skip that version. Automatic checks can be disabled and manual checks are available in Settings and the menu-bar context menu. The updater only reads public release metadata; downloads continue through `health.sparkles.dev` and installation remains under the user's control.
+Air Stats checks the repository's latest public GitHub release once a day by default. When a newer stable version is available, macOS shows an update dialog with options to download it, be reminded later, or skip that version. Automatic checks can be disabled and manual checks are available in Settings and the menu-bar context menu. The updater only reads public release metadata; downloads continue through `health.aidaniil.com` and installation remains under the user's control.
 
 ### Fitbit scores and live heart rate
 
@@ -149,11 +149,11 @@ Before packaging, increment both `CFBundleShortVersionString` and `CFBundleVersi
 
 For an explicitly unnotarized preview only, omit `AIRSTATS_NOTARY_PROFILE` and set `AIRSTATS_ALLOW_UNNOTARIZED=1`. Packaging otherwise fails closed when notarization is not configured. Preview builds must be labeled as unnotarized.
 
-`deploy/worker.mjs` is the complete download and release service. It redirects the root and explicit download paths to the latest public GitHub release, and answers `/latest` with that release's tag and notes so installed copies can check for updates. It has no storage, user accounts, or landing page; it counts requests as described in [Install counting](#install-counting). Test it with `node --test deploy/worker.test.mjs`; deploy with `wrangler deploy --config deploy/wrangler.jsonc` from an authorized Cloudflare account. Never put deployment credentials in the repository.
+`deploy/worker.mjs` is the complete download, landing, and release service. It serves the one-page site from `deploy/landing.mjs` at the root, redirects `/download` and `/AirStats.dmg` to the latest public GitHub release, and answers `/latest` with that release's tag and notes so installed copies can check for updates. The page is a single self-contained document with no script, external asset, or cookie; the service has no storage or user accounts, and counts requests as described in [Install counting](#install-counting). Test it with `node --test deploy/worker.test.mjs`; deploy with `wrangler deploy --config deploy/wrangler.jsonc` from an authorized Cloudflare account. Never put deployment credentials in the repository.
 
 ## Install counting
 
-The project has no way to see how many people use Air Stats other than counting, so the once-a-day update check doubles as the count. Instead of asking GitHub directly, the app asks `health.sparkles.dev/latest`, which forwards the same public release and records four things: whether this is a first launch, a daily check, or a manual one; the app version; the macOS major and minor version; and the country Cloudflare already sees. Downloads from the redirect are counted the same way.
+The project has no way to see how many people use Air Stats other than counting, so the once-a-day update check doubles as the count. Instead of asking GitHub directly, the app asks `health.aidaniil.com/latest`, which forwards the same public release and records four things: whether this is a first launch, a daily check, or a manual one; the app version; the macOS major and minor version; and the country Cloudflare already sees. Downloads from the redirect are counted the same way.
 
 Nothing else is sent. There is no account, no installation identifier, no Google or Fitbit data, and no health reading of any kind — the app never attaches one to this request. Addresses are not stored: to avoid counting one Mac twice in a day, the service derives a truncated digest of the caller and a daily-rotating secret, which cannot be linked back to an address or followed from one day to the next. Set that secret before deploying, or the service records no per-caller key at all and reports raw request counts:
 
@@ -194,4 +194,4 @@ Implementation checked against Google's published v4 discovery schema and docume
 
 ## Layout
 
-`Sources/HealthCore` contains the API client, data parsing, query filters, and OAuth primitives. `Sources/AirStats` contains the native app, sign-in listener, Keychain storage, and views. `Tests/HealthCoreTests` contains unit and HTTP integration tests. `scripts/build.sh` packages the executable and a locally drawn icon into an `.app` bundle.
+`Sources/HealthCore` contains the API client, data parsing, query filters, and OAuth primitives. `Sources/AirStats` contains the native app, sign-in listener, Keychain storage, and views. `Tests/HealthCoreTests` contains unit and HTTP integration tests. `scripts/build.sh` packages the executable and a locally drawn icon into an `.app` bundle. `deploy/` contains the Cloudflare Worker that serves health.aidaniil.com, its landing page, and their tests.

@@ -2,14 +2,26 @@ import Foundation
 
 public enum HealthAPIError: LocalizedError {
     case http(Int, String), pagination, invalidResponse
+    /// Google reports the actionable cause in `{"error":{"message":…,"details":[{"reason":…}]}}`,
+    /// so the status code alone is never enough to tell someone what to do next.
+    static func detail(_ body: String) -> (reason: String?, message: String?) {
+        guard let value = try? JSONDecoder().decode(JSONValue.self, from: Data(body.utf8)) else { return (nil, nil) }
+        let error = value["error"]
+        return (error["details"].array.compactMap { $0["reason"].string }.first, error["message"].string)
+    }
     public var errorDescription: String? {
+        if case .http(_, let body) = self, Self.detail(body).reason == "ACCOUNT_NOT_LINKED" {
+            return "This Google account isn't linked to Google Health, so it has no Fitbit data to read. Link it at fitbit.google.com, or reconnect Air Stats with the account that holds your Fitbit data."
+        }
         switch self {
         case .http(401, _): return "Google access expired. Reconnect your account in Settings."
         case .http(403, let reason):
             if reason.contains("SERVICE_DISABLED") { return "Enable Google Health API in your Google Cloud project." }
             return "Google denied access. Reconnect and allow this data permission; check the project's test-user list."
         case .http(429, _): return "Google's request limit was reached. Wait a few minutes before refreshing."
-        case .http(let status, _): return "Google Health returned HTTP \(status). Try again later."
+        case .http(let status, let body):
+            if let message = Self.detail(body).message { return "Google Health returned HTTP \(status): \(message)" }
+            return "Google Health returned HTTP \(status). Try again later."
         case .pagination: return "Google returned an incomplete data range. Try refreshing again."
         case .invalidResponse: return "Google returned an unexpected response."
         }

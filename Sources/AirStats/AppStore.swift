@@ -79,10 +79,12 @@ final class AppStore: ObservableObject {
                 let result = try await client.snapshot(token: token)
                 try Task.checkCancellation()
                 guard current == generation else { return }
-                snapshot = result
+                snapshot = result.preservingReadings(from: snapshot)
                 now = Date()
                 if result.issues.count == HealthQuery.types.count + 1 {
-                    error = "Couldn't refresh your data. Open Settings for details."
+                    // Every source failed for the same reason: say what it was instead of "see Settings".
+                    let reasons = Set(result.issues.values)
+                    error = reasons.count == 1 ? reasons.first : "Couldn't refresh your data. Open Settings for details."
                 }
                 if result.issues.values.contains(where: { $0.contains("request limit") }) {
                     nextRefresh = Date().addingTimeInterval(max(900, refreshInterval))
